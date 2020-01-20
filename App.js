@@ -9,16 +9,27 @@ const Container = styled.SafeAreaView`
   flex: 1;
 `;
 const Header = styled.View`
-  justify-content: center;
-  align-items: center;
+  justify-content: space-between;
+  flex-direction: row;
   height:80px;
 `
 const Title = styled.Text`
   font-size: 20px;
+  margin-left:20px;
+  margin-top: 20px;
 `;
-const ListTodo = styled.FlatList`
+const ButtonSync = styled.TouchableHighlight`
+  width:28px;
+  height:28px;
+  margin-right: 20px;
+  margin-top: 20px;
+  justify-content: center;
+  align-items:center;
+`;
+const ImageSync = styled.Image`
   
 `;
+const ListTodo = styled.FlatList``;
 
 const Footer = styled.View`
  width: 100%;
@@ -72,35 +83,37 @@ const Todo = () => {
   const url = 'https://b7web.com.br/todo/73938';
 
   //Listar items direto da internet
-  useEffect(() => {
-    //Agora verifica se esta conectado. Se estiver conectado, fluxo normal
-    switch(netStatus){
-      case 1:
-        fetch(url)
-          .then(r => r.json())
-          .then(json => {
-          let t = json.todo;
-          setDados(t)
-          //Armazena no AsyncStorage
-          let lista = JSON.stringify(json.todo)//pegando o json em forma de string
-          AsyncStorage.setItem(dados, lista)//Armazenando a string denttro do state
-        })
-        break;
-      //Se não estiver conectado, puxa do AsyncStorage
-      case 0:
-        AsyncStorage.getItem(dados).then(v => {
-          if(v != ''){
-            let listaJSON = JSON.parse(v)
-            dados = listaJSON
-          }
-          
-          setDados(dados)
-          
-        })
-        break;
-    }
-    
-  },[])
+  const loadList = () => {
+      //Agora verifica se esta conectado. Se estiver conectado, fluxo normal
+      switch(netStatus){
+        case 1:
+          fetch(url)
+            .then(r => r.json())
+            .then(json => {
+            let t = json.todo;
+            setDados(t)
+            //Armazena no AsyncStorage
+            let lista = JSON.stringify(json.todo)//pegando o json em forma de string
+            AsyncStorage.setItem('dados', lista)//Armazenando a string denttro do state
+          })
+          break;
+        //Se não estiver conectado, puxa do AsyncStorage
+        case 0:
+          AsyncStorage.getItem('dados').then(v => {
+            let s = []
+            if(v != ''){
+              let listaJSON = JSON.parse(v)
+              s = listaJSON
+            }
+            
+            setDados(s)
+            
+          })
+          break;
+      }
+      
+  }
+  
   
   //Utilizando o useEffect para que, assim que abrir o aplicativo, 
   //o NetInfo ja identifique se o aplicativo esta online ou offline
@@ -111,47 +124,93 @@ const Todo = () => {
       } else{
         setNetStatus(1)
       }
+
+      if(dados.length == 0){
+        loadList()
+      }
     });
   }, [])
  
   //Adicionar Item
-  const addItem = () => {
-    switch(netStatus){
-      case 1:
-        fetch(url, {
-          method:'POST',
-          headers:{
-            'Accept':'application/json',
-            'Content-Type':'application/json'
-          },
-          body:JSON.stringify({
-            item:texto
-          })
-        })
-          .then(r => r.json())
-          .then(jsont => {
-            alert('Item inserido com sucesso')
-          })
-        break;
-      case 0:
-        alert('Não foi possível adicionar. Não temos conexão!');
-        break;
+  // const addItem = () => {
+  //   switch(netStatus){
+  //     case 1:
+  //       fetch(url, {
+  //         method:'POST',
+  //         headers:{
+  //           'Accept':'application/json',
+  //           'Content-Type':'application/json'
+  //         },
+  //         body:JSON.stringify({
+  //           item:texto
+  //         })
+  //       })
+  //         .then(r => r.json())
+  //         .then(jsont => {
+  //           alert('Item inserido com sucesso')
+  //         })
+  //       break;
+  //     case 0:
+  //       alert('Não foi possível adicionar. Não temos conexão!');
+  //       break;
 
-    }
+  //   }
     
+  // }
+
+  const addButton = () => {  
+    AsyncStorage.getItem('dados').then(v => {
+      let s = []
+      let listaJSON = JSON.parse(v)
+      listaJSON.push({
+        item: input,
+        done:'0',
+        id:0
+      })
+     
+      s = listaJSON
+
+      let listaStr = JSON.stringify(listaJSON)
+      AsyncStorage.setItem('dados', listaStr)
+
+      setInput('');
+      setDados(s)
+    })
+
+    //addItem()
   }
 
-  const addButton = () => {
-    texto = input;
-    let setup = '';
-    setInput(setup);
-    addItem()
+  const sincronizar = () => {
+    AsyncStorage.getItem('dados').then(v => {
+      fetch(`${url}/sync`, {
+        method:'POST',
+        headers:{
+          'Accept':'application/json',
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({
+          json:v
+        })
+      })
+        .then(r => r.json())
+        .then(json => {
+          if (json.todo.status){
+            alert('Itens sincronizados com sucesso')
+          }else{
+            alert('Tente mais tarde')
+          }
+          
+        })
+    })
   }
 
   return(
     <Container>
       <Header>
         <Title>ToDo List</Title>
+        <ButtonSync underlayColor='transparent' onPress={sincronizar}>
+          <ImageSync source={require('./src/img/sync_press.png')} />
+        </ButtonSync>
       </Header>
       <ListTodo 
         data={dados}
